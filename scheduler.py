@@ -1,188 +1,240 @@
-import json
-import os
+import threading
+import time
+from datetime import datetime
+
+from sender import MessageSender
 
 
-class MessageStorage:
+class MessageScheduler:
 
-    def __init__(self, filename="messages.json"):
+    def __init__(
+        self,
+        status_callback=None,
+        change_callback=None,
+        delay_before_send=5
+    ):
 
-        self.filename = filename
+        self.messages = []
+
+        self.running = False
+
+        self.thread = None
+
+        self.lock = threading.Lock()
+
+        self.status_callback = status_callback
+
+        self.change_callback = change_callback
+
+
+        self.sender = MessageSender(
+            delay_before_send=delay_before_send,
+            status_callback=self._send_status
+        )
 
 
 
     # ==================================================
-    # ZAPIS
+    # START
     # ==================================================
 
-    def save(self, messages):
+    def start(self):
 
-        try:
+        if self.running:
 
-            temp_file = self.filename + ".tmp"
+            return
 
 
-            with open(
-                temp_file,
-                "w",
-                encoding="utf-8"
-            ) as file:
+        self.running = True
 
-                json.dump(
-                    messages,
-                    file,
-                    indent=4,
-                    ensure_ascii=False
+
+        self.thread = threading.Thread(
+            target=self._worker,
+            daemon=True
+        )
+
+
+        self.thread.start()
+
+
+
+    # ==================================================
+    # STOP
+    # ==================================================
+
+    def stop(self):
+
+        self.running = False
+
+
+        self.sender.cancel()
+
+
+
+    # ==================================================
+    # DODAWANIE
+    # ==================================================
+
+    def add_message(
+        self,
+        message
+    ):
+
+        with self.lock:
+
+            self.messages.append(
+                message
+            )
+
+
+        self._notify_change()
+
+
+        self._send_status(
+            f"Dodano wiadomość na {message['time']}"
+        )
+
+
+
+    # ==================================================
+    # USUWANIE
+    # ==================================================
+
+    def remove_message(
+        self,
+        index
+    ):
+
+        with self.lock:
+
+            if 0 <= index < len(self.messages):
+
+                removed = self.messages.pop(index)
+
+            else:
+
+                return
+
+
+        self._notify_change()
+
+
+        self._send_status(
+            f"Usunięto wiadomość {removed['time']}"
+        )
+
+
+
+    # ==================================================
+    # GŁÓWNA PĘTLA
+    # ==================================================
+
+    def _worker(self):
+
+        while self.running:
+
+
+            now = datetime.now().strftime(
+                "%H:%M:%S"
+            )
+
+
+            message_to_send = None
+
+
+            with self.lock:
+
+                for message in self.messages:
+
+                    if message["time"] == now:
+
+                        message_to_send = message
+
+                        break
+
+
+
+            if message_to_send:
+
+
+                self._send_status(
+                    f"Wysyłanie wiadomości {now}"
                 )
 
 
-            # bezpieczna zamiana pliku
+                try:
 
-            os.replace(
-                temp_file,
-                self.filename
-            )
-
-
-            return True
-
-
-        except Exception as e:
-
-            print(
-                f"Błąd zapisu wiadomości: {e}"
-            )
-
-            return False
-
-
-
-    # ==================================================
-    # ODCZYT
-    # ==================================================
-
-    def load(self):
-
-        if not os.path.exists(
-            self.filename
-        ):
-
-            return []
-
-
-        try:
-
-            with open(
-                self.filename,
-                "r",
-                encoding="utf-8"
-            ) as file:
-
-                data = json.load(
-                    file
-                )
-
-
-            if not isinstance(
-                data,
-                list
-            ):
-
-                return []
-
-
-            return self._validate(
-                data
-            )
-
-
-        except json.JSONDecodeError:
-
-            print(
-                "Plik wiadomości jest uszkodzony."
-            )
-
-            return []
-
-
-        except Exception as e:
-
-            print(
-                f"Błąd odczytu wiadomości: {e}"
-            )
-
-            return []
-
-
-
-    # ==================================================
-    # WALIDACJA
-    # ==================================================
-
-    def _validate(self, messages):
-
-        valid = []
-
-
-        for item in messages:
-
-            if not isinstance(
-                item,
-                dict
-            ):
-
-                continue
-
-
-            if (
-                "time" not in item
-                or
-                "message" not in item
-            ):
-
-                continue
-
-
-            valid.append(
-                {
-                    "time": str(
-                        item["time"]
-                    ),
-
-                    "message": str(
-                        item["message"]
+                    self.sender.send(
+                        message_to_send["message"]
                     )
-                }
+
+
+                except Exception as e:
+
+                    self._send_status(
+                        f"Błąd wysyłania: {e}"
+                    )
+
+
+
+                with self.lock:
+
+                    if message_to_send in self.messages:
+
+                        self.messages.remove(
+                            message_to_send
+                        )
+
+
+
+                self._notify_change()
+
+
+
+            time.sleep(
+                1
             )
 
 
-        return valid
-
-
 
     # ==================================================
-    # CZYSZCZENIE
+    # CALLBACKI
     # ==================================================
 
-    def clear(self):
+    def _notify_change(self):
 
-        try:
+        if self.change_callback:
 
-            if os.path.exists(
-                self.filename
-            ):
+            try:
 
-                os.remove(
-                    self.filename
+                self.change_callback(
+                    self.messages
                 )
 
+            except Exception:
 
-            return True
+                pass
 
 
-        except Exception as e:
 
-            print(
-                f"Błąd usuwania pliku: {e}"
-            )
+    def _send_status(
+        self,
+        text
+    ):
 
-            return False
+        print(
+            text
+        )
+
+
+        if self.status_callback:
+
+            try:
+
+                self.status_callback(
+                    text
+                )
+
+            except Exception:
+
+                pass

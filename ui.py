@@ -24,12 +24,26 @@ class MessageSchedulerApp(ctk.CTk):
         self.config = config
 
         self.title(
-            self.config.get("app", "title")
-            or "📩 Message Scheduler"
+            self.config.get(
+                "app",
+                "title",
+                "📩 Message Scheduler"
+            )
         )
 
-        width = self.config.get("app", "width") or 950
-        height = self.config.get("app", "height") or 700
+
+        width = self.config.get(
+            "app",
+            "width",
+            950
+        )
+
+        height = self.config.get(
+            "app",
+            "height",
+            700
+        )
+
 
         self.geometry(
             f"{width}x{height}"
@@ -39,30 +53,31 @@ class MessageSchedulerApp(ctk.CTk):
         self.storage = MessageStorage(
             self.config.get(
                 "storage",
-                "messages_file"
+                "messages_file",
+                "messages.json"
             )
-            or "messages.json"
-        )
-
-
-        self.scheduler = MessageScheduler(
-            status_callback=self.update_status,
-            change_callback=self.scheduler_changed,
-            delay_before_send=
-                self.config.get(
-                    "sender",
-                    "delay_before_send"
-                )
-                or 5
         )
 
 
         self.message_widgets = []
 
 
+        self.scheduler = MessageScheduler(
+            status_callback=self.update_status,
+            change_callback=self.scheduler_changed,
+            delay_before_send=self.config.get(
+                "sender",
+                "delay_before_send",
+                5
+            )
+        )
+
+
         self.create_ui()
 
+
         self.load_messages()
+
 
         self.scheduler.start()
 
@@ -91,8 +106,6 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
-        # HEADER
-
         header = CardFrame(
             self
         )
@@ -101,7 +114,7 @@ class MessageSchedulerApp(ctk.CTk):
             row=0,
             column=0,
             padx=20,
-            pady=(20, 10),
+            pady=(20,10),
             sticky="ew"
         )
 
@@ -114,8 +127,6 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
-
-        # CONTENT
 
         content = CardFrame(
             self
@@ -147,8 +158,6 @@ class MessageSchedulerApp(ctk.CTk):
 
 
 
-        # WIADOMOŚĆ
-
         SectionLabel(
             content,
             text="Treść wiadomości"
@@ -156,7 +165,7 @@ class MessageSchedulerApp(ctk.CTk):
             row=0,
             column=0,
             padx=20,
-            pady=(20, 5),
+            pady=(20,5),
             sticky="w"
         )
 
@@ -169,6 +178,7 @@ class MessageSchedulerApp(ctk.CTk):
             )
         )
 
+
         self.message_box.grid(
             row=1,
             column=0,
@@ -179,11 +189,10 @@ class MessageSchedulerApp(ctk.CTk):
 
 
 
-        # PANEL BOCZNY
-
         side = CardFrame(
             content
         )
+
 
         side.grid(
             row=0,
@@ -199,7 +208,7 @@ class MessageSchedulerApp(ctk.CTk):
             side,
             text="Godzina wysłania"
         ).pack(
-            pady=(20, 5)
+            pady=(20,5)
         )
 
 
@@ -228,7 +237,7 @@ class MessageSchedulerApp(ctk.CTk):
 
         ModernButton(
             side,
-            text="🗑 Usuń zaznaczoną",
+            text="🗑 Usuń ostatnią",
             command=self.delete_last,
             fg_color="#8b0000",
             hover_color="#b22222"
@@ -239,11 +248,12 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
+
         SectionLabel(
             side,
             text="Harmonogram"
         ).pack(
-            pady=(20, 5)
+            pady=(20,5)
         )
 
 
@@ -260,7 +270,6 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
-        # STATUS
 
         self.status = StatusBar(
             self
@@ -270,7 +279,7 @@ class MessageSchedulerApp(ctk.CTk):
             row=2,
             column=0,
             padx=20,
-            pady=(0, 15),
+            pady=(0,15),
             sticky="ew"
         )
 
@@ -284,13 +293,15 @@ class MessageSchedulerApp(ctk.CTk):
 
         text = self.message_box.get(
             "1.0",
-            "end"
-        ).rstrip()
+            "end-1c"
+        )
+
 
         send_time = self.time_entry.get().strip()
 
 
-        if not text:
+
+        if not text.strip():
 
             messagebox.showwarning(
                 "Brak tekstu",
@@ -300,6 +311,7 @@ class MessageSchedulerApp(ctk.CTk):
             return
 
 
+
         try:
 
             datetime.strptime(
@@ -307,25 +319,23 @@ class MessageSchedulerApp(ctk.CTk):
                 "%H:%M:%S"
             )
 
+
         except ValueError:
 
             messagebox.showwarning(
                 "Błędna godzina",
-                "Format: HH:MM:SS"
+                "Format czasu: HH:MM:SS"
             )
 
             return
 
 
 
-        message = {
-            "time": send_time,
-            "message": text
-        }
-
-
         self.scheduler.add_message(
-            message
+            {
+                "time": send_time,
+                "message": text
+            }
         )
 
 
@@ -335,7 +345,10 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
-        self.refresh_messages()
+        self.time_entry.delete(
+            0,
+            "end"
+        )
 
 
 
@@ -386,9 +399,6 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
-        self.refresh_messages()
-
-
 
     def delete_last(self):
 
@@ -398,13 +408,23 @@ class MessageSchedulerApp(ctk.CTk):
                 len(self.scheduler.messages)-1
             )
 
-            self.refresh_messages()
-
 
 
     # ==================================================
-    # STORAGE / CALLBACK
+    # STORAGE
     # ==================================================
+
+    def load_messages(self):
+
+        messages = self.storage.load()
+
+
+        self.scheduler.messages = messages
+
+
+        self.refresh_messages()
+
+
 
     def scheduler_changed(self, messages):
 
@@ -412,26 +432,11 @@ class MessageSchedulerApp(ctk.CTk):
             messages
         )
 
+
         self.after(
             0,
             self.refresh_messages
         )
-
-
-
-    def load_messages(self):
-
-        messages = self.storage.load()
-
-
-        for message in messages:
-
-            self.scheduler.add_message(
-                message
-            )
-
-
-        self.refresh_messages()
 
 
 
@@ -457,8 +462,10 @@ class MessageSchedulerApp(ctk.CTk):
 
         self.scheduler.stop()
 
+
         self.storage.save(
             self.scheduler.messages
         )
+
 
         self.destroy()

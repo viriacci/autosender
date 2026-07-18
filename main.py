@@ -4,35 +4,55 @@ from config import Config
 from ui import MessageSchedulerApp
 
 
+
 def main():
 
-    # Wczytanie konfiguracji
+    # ==============================================
+    # KONFIGURACJA
+    # ==============================================
+
     config = Config()
 
 
-    # Motyw aplikacji
+
+    # ==============================================
+    # TRYB WYŚWIETLANIA
+    # ==============================================
+
     appearance = config.get(
         "app",
-        "theme"
+        "theme",
+        "Dark"
     )
 
-    if appearance:
-        ctk.set_appearance_mode(
-            appearance
-        )
-    else:
-        ctk.set_appearance_mode(
-            "Dark"
-        )
+
+    ctk.set_appearance_mode(
+        appearance
+    )
 
 
-    # Kolorystyka CustomTkinter
-    ctk.set_default_color_theme(
+
+    # ==============================================
+    # KOLOR MOTYWU
+    # ==============================================
+
+    color_theme = config.get(
+        "app",
+        "color_theme",
         "blue"
     )
 
 
-    # Start aplikacji
+    ctk.set_default_color_theme(
+        color_theme
+    )
+
+
+
+    # ==============================================
+    # START APLIKACJI
+    # ==============================================
+
     app = MessageSchedulerApp(
         config
     )
@@ -43,4 +63,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
