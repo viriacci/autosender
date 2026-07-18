@@ -3,13 +3,12 @@
         "title": "📩 Message Scheduler",
         "width": 950,
         "height": 700,
-        "theme": "Dark"
+        "theme": "Dark",
+        "color_theme": "blue"
     },
-
     "sender": {
         "delay_before_send": 5
     },
-
     "storage": {
         "messages_file": "messages.json"
     }

@@ -26,6 +26,11 @@ class MessageScheduler:
 
         self.change_callback = change_callback
 
+        self.sending = False
+
+        # zapamiętane wykonane wiadomości
+        self.sent_messages = set()
+
 
         self.sender = MessageSender(
             delay_before_send=delay_before_send,
@@ -41,7 +46,6 @@ class MessageScheduler:
     def start(self):
 
         if self.running:
-
             return
 
 
@@ -66,7 +70,6 @@ class MessageScheduler:
 
         self.running = False
 
-
         self.sender.cancel()
 
 
@@ -75,10 +78,7 @@ class MessageScheduler:
     # DODAWANIE
     # ==================================================
 
-    def add_message(
-        self,
-        message
-    ):
+    def add_message(self, message):
 
         with self.lock:
 
@@ -100,20 +100,17 @@ class MessageScheduler:
     # USUWANIE
     # ==================================================
 
-    def remove_message(
-        self,
-        index
-    ):
+    def remove_message(self, index):
 
         with self.lock:
 
-            if 0 <= index < len(self.messages):
-
-                removed = self.messages.pop(index)
-
-            else:
-
+            if index < 0 or index >= len(self.messages):
                 return
+
+
+            removed = self.messages.pop(
+                index
+            )
 
 
         self._notify_change()
@@ -126,7 +123,7 @@ class MessageScheduler:
 
 
     # ==================================================
-    # GŁÓWNA PĘTLA
+    # WORKER
     # ==================================================
 
     def _worker(self):
@@ -144,21 +141,61 @@ class MessageScheduler:
 
             with self.lock:
 
-                for message in self.messages:
 
-                    if message["time"] == now:
+                # blokada podczas wysyłania
 
-                        message_to_send = message
+                if not self.sending:
 
-                        break
+
+                    for msg in list(self.messages):
+
+
+                        unique_id = (
+                            msg["time"],
+                            msg["message"]
+                        )
+
+
+                        if msg["time"] == now:
+
+
+                            # już wykonana
+
+                            if unique_id in self.sent_messages:
+                                continue
+
+
+
+                            # natychmiast blokujemy
+
+                            self.sending = True
+
+
+                            self.sent_messages.add(
+                                unique_id
+                            )
+
+
+                            message_to_send = msg
+
+
+                            self.messages.remove(
+                                msg
+                            )
+
+
+                            break
 
 
 
             if message_to_send:
 
 
+                self._notify_change()
+
+
                 self._send_status(
-                    f"Wysyłanie wiadomości {now}"
+                    f"Wysyłanie {now}"
                 )
 
 
@@ -176,18 +213,12 @@ class MessageScheduler:
                     )
 
 
-
-                with self.lock:
-
-                    if message_to_send in self.messages:
-
-                        self.messages.remove(
-                            message_to_send
-                        )
+                finally:
 
 
+                    with self.lock:
 
-                self._notify_change()
+                        self.sending = False
 
 
 
@@ -198,7 +229,7 @@ class MessageScheduler:
 
 
     # ==================================================
-    # CALLBACKI
+    # CALLBACK LISTY
     # ==================================================
 
     def _notify_change(self):
@@ -208,7 +239,7 @@ class MessageScheduler:
             try:
 
                 self.change_callback(
-                    self.messages
+                    self.messages.copy()
                 )
 
             except Exception:
@@ -217,14 +248,13 @@ class MessageScheduler:
 
 
 
-    def _send_status(
-        self,
-        text
-    ):
+    # ==================================================
+    # STATUS
+    # ==================================================
 
-        print(
-            text
-        )
+    def _send_status(self, text):
+
+        print(text)
 
 
         if self.status_callback:

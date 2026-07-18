@@ -75,9 +75,7 @@ class MessageSchedulerApp(ctk.CTk):
 
         self.create_ui()
 
-
         self.load_messages()
-
 
         self.scheduler.start()
 
@@ -106,9 +104,7 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
-        header = CardFrame(
-            self
-        )
+        header = CardFrame(self)
 
         header.grid(
             row=0,
@@ -128,9 +124,7 @@ class MessageSchedulerApp(ctk.CTk):
 
 
 
-        content = CardFrame(
-            self
-        )
+        content = CardFrame(self)
 
         content.grid(
             row=1,
@@ -170,9 +164,11 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
+
         self.message_box = ctk.CTkTextbox(
             content,
             corner_radius=12,
+            wrap="word",
             font=ctk.CTkFont(
                 size=14
             )
@@ -204,6 +200,7 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
+
         SectionLabel(
             side,
             text="Godzina wysłania"
@@ -216,6 +213,7 @@ class MessageSchedulerApp(ctk.CTk):
             side,
             placeholder_text="HH:MM:SS"
         )
+
 
         self.time_entry.pack(
             padx=20
@@ -262,6 +260,7 @@ class MessageSchedulerApp(ctk.CTk):
             height=300
         )
 
+
         self.list_frame.pack(
             padx=15,
             pady=5,
@@ -275,6 +274,7 @@ class MessageSchedulerApp(ctk.CTk):
             self
         )
 
+
         self.status.grid(
             row=2,
             column=0,
@@ -282,6 +282,61 @@ class MessageSchedulerApp(ctk.CTk):
             pady=(0,15),
             sticky="ew"
         )
+
+
+
+    # ==================================================
+    # NORMALIZACJA CZASU
+    # ==================================================
+
+    def normalize_time(self, value):
+
+        if not value:
+            return ""
+
+
+        parts = value.split(":")
+
+
+        try:
+
+            if len(parts) == 1:
+
+                hour = int(parts[0])
+                minute = 0
+                second = 0
+
+
+            elif len(parts) == 2:
+
+                hour = int(parts[0])
+                minute = int(parts[1])
+                second = 0
+
+
+            elif len(parts) == 3:
+
+                hour = int(parts[0])
+                minute = int(parts[1])
+                second = int(parts[2])
+
+
+            else:
+
+                return value
+
+
+
+            return (
+                f"{hour:02d}:"
+                f"{minute:02d}:"
+                f"{second:02d}"
+            )
+
+
+        except ValueError:
+
+            return value
 
 
 
@@ -297,7 +352,9 @@ class MessageSchedulerApp(ctk.CTk):
         )
 
 
-        send_time = self.time_entry.get().strip()
+        send_time = self.normalize_time(
+            self.time_entry.get().strip()
+        )
 
 
 
@@ -324,7 +381,7 @@ class MessageSchedulerApp(ctk.CTk):
 
             messagebox.showwarning(
                 "Błędna godzina",
-                "Format czasu: HH:MM:SS"
+                "Podaj czas np. 3:42 albo 03:42:00"
             )
 
             return
@@ -353,18 +410,16 @@ class MessageSchedulerApp(ctk.CTk):
 
 
     # ==================================================
-    # LISTA
+    # RESZTA FUNKCJI BEZ ZMIAN
     # ==================================================
 
     def refresh_messages(self):
 
         for widget in self.message_widgets:
-
             widget.destroy()
 
 
         self.message_widgets.clear()
-
 
 
         for index, msg in enumerate(
@@ -410,17 +465,11 @@ class MessageSchedulerApp(ctk.CTk):
 
 
 
-    # ==================================================
-    # STORAGE
-    # ==================================================
-
     def load_messages(self):
 
         messages = self.storage.load()
 
-
         self.scheduler.messages = messages
-
 
         self.refresh_messages()
 
@@ -440,10 +489,6 @@ class MessageSchedulerApp(ctk.CTk):
 
 
 
-    # ==================================================
-    # STATUS
-    # ==================================================
-
     def update_status(self, text):
 
         self.after(
@@ -454,18 +499,12 @@ class MessageSchedulerApp(ctk.CTk):
 
 
 
-    # ==================================================
-    # CLOSE
-    # ==================================================
-
     def close(self):
 
         self.scheduler.stop()
 
-
         self.storage.save(
             self.scheduler.messages
         )
-
 
         self.destroy()
