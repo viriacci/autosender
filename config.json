@@ -1,0 +1,16 @@
+{
+    "app": {
+        "title": "📩 Message Scheduler",
+        "width": 950,
+        "height": 700,
+        "theme": "Dark"
+    },
+
+    "sender": {
+        "delay_before_send": 5
+    },
+
+    "storage": {
+        "messages_file": "messages.json"
+    }
+}
